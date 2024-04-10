@@ -17,7 +17,17 @@ def rotation_matrix(axis, angle):
   Returns:
     3x3 rotation matrix as a numpy array
   """
-
+  c = np.cos(angle)
+  s = np.sin(angle)
+  t = 1 - c
+  x, y, z = axis
+    
+  # Compute rotation matrix
+  rot_mat = np.array([[t*x*x + c,    t*x*y - s*z,  t*x*z + s*y],
+                  [t*x*y + s*z,  t*y*y + c,    t*y*z - s*x],
+                  [t*x*z - s*y,  t*y*z + s*x,  t*z*z + c]])
+    
+  
   rot_mat = np.eye(3)
   return rot_mat
 
@@ -33,6 +43,12 @@ def homogenous_transformation_matrix(axis, angle, v_A):
   Returns:
     4x4 transformation matrix as a numpy array
   """
+  rot_mat = rotation_matrix(axis, angle)
+
+    # Create a 4x4 transformation matrix
+  T = np.eye(4)
+  T[:3, :3] = rot_mat  # Assign rotation matrix to upper-left 3x3 submatrix
+  T[:3, 3] = v_A  # Assign translation vector to the last column
 
   T = np.eye(4)
   return T
@@ -48,6 +64,20 @@ def fk_hip(joint_angles):
   Returns:
     4x4 matrix representing the pose of the hip frame in the base frame
   """
+  alpha = [0, np.pi / 2, 0]  # twist angles (radians)
+  a = [0, 0, UPPER_LEG_OFFSET]  # link lengths (meters)
+  d = [0, HIP_OFFSET, 0]  # link offsets (meters)
+  theta = joint_angles  # joint angles (radians)
+
+    # Initialize homogeneous transformation matrices
+  T = np.eye(4)
+
+    # Compute transformation matrices for each joint
+  for i in range(3):
+        # Compute transformation matrix for joint i
+        T_i = homogenous_transformation_matrix([0, 0, 1], theta[i], [0, 0, d[i]])  # rotation about z-axis, translation along z-axis
+        T_i_next = homogenous_transformation_matrix([0, 1, 0], alpha[i], [a[i], 0, 0])  # rotation about y-axis, translation along x-axis
+        T = np.dot(T, np.dot(T_i, T_i_next))
 
   hip_frame = np.eye(4)  # remove this line when you write your solution
   return hip_frame
