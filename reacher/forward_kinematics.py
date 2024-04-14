@@ -18,7 +18,9 @@ def rotation_matrix(axis, angle):
     3x3 rotation matrix as a numpy array
   """
   c = np.cos(angle)
+  c = round(c, 5)
   s = np.sin(angle)
+  s = round(s, 5)
   t = 1 - c
   x, y, z = axis
     
@@ -30,6 +32,8 @@ def rotation_matrix(axis, angle):
   
   rot_mat = np.eye(3)
   return rot_mat
+
+#print(rotation_matrix([1,0,0], 1.57079632679))
 
 def homogenous_transformation_matrix(axis, angle, v_A):
   """
@@ -50,7 +54,7 @@ def homogenous_transformation_matrix(axis, angle, v_A):
   T[:3, :3] = rot_mat  # Assign rotation matrix to upper-left 3x3 submatrix
   T[:3, 3] = v_A  # Assign translation vector to the last column
 
-  T = np.eye(4)
+
   return T
 
 def fk_hip(joint_angles):
@@ -79,7 +83,7 @@ def fk_hip(joint_angles):
         T_i_next = homogenous_transformation_matrix([0, 1, 0], alpha[i], [a[i], 0, 0])  # rotation about y-axis, translation along x-axis
         T = np.dot(T, np.dot(T_i, T_i_next))
 
-  hip_frame = np.eye(4)  # remove this line when you write your solution
+  hip_frame = T  # remove this line when you write your solution
   return hip_frame
 
 def fk_shoulder(joint_angles):
@@ -93,12 +97,21 @@ def fk_shoulder(joint_angles):
   Returns:
     4x4 matrix representing the pose of the shoulder frame in the base frame
   """
-
-  # remove these lines when you write your solution
-  default_sphere_location = np.array([[0.15, 0.0, -0.1]])
-  shoulder_frame = np.block(
-    [[np.eye(3), default_sphere_location.T], 
-     [0, 0, 0, 1]])
+  alpha = [0, np.pi / 2, 0]  # twist angles (radians)
+  a = [0, 0, UPPER_LEG_OFFSET]  # link lengths (meters)
+  d = [0, HIP_OFFSET, LOWER_LEG_OFFSET]  # link offsets (meters)
+  theta = joint_angles  # joint angles (radians)
+    
+    # Initialize transformation matrix
+  T = np.eye(4)
+    
+    # Compute transformation matrices for each joint
+  for i in range(2):  # Only go up to shoulder joint (skip elbow joint)
+        # Compute transformation matrix for joint i
+        T_i = homogenous_transformation_matrix([0, 0, 1], theta[i], [0, 0, d[i]])
+        T_i_next = homogenous_transformation_matrix([0, 1, 0], alpha[i], [a[i], 0, 0])
+        # Update the total transformation matrix
+        shoulder_frame = np.dot(T, np.dot(T_i, T_i_next))
   return shoulder_frame
 
 def fk_elbow(joint_angles):
