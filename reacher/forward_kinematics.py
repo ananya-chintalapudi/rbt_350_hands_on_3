@@ -86,7 +86,7 @@ def fk_shoulder(joint_angles):
   """
   hip_frame = fk_hip(joint_angles)
   shoulder_frame = np.copy(hip_frame)
-  shoulder_frame[1, 3] += HIP_OFFSET
+  shoulder_frame[1, 3] -= HIP_OFFSET
   return shoulder_frame
 
 def fk_elbow(joint_angles):
