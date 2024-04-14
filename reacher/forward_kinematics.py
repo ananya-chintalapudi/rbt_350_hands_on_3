@@ -68,22 +68,9 @@ def fk_hip(joint_angles):
   Returns:
     4x4 matrix representing the pose of the hip frame in the base frame
   """
-  alpha = [0, np.pi / 2, 0]  # twist angles (radians)
-  a = [0, 0, UPPER_LEG_OFFSET]  # link lengths (meters)
-  d = [0, HIP_OFFSET, 0]  # link offsets (meters)
-  theta = joint_angles  # joint angles (radians)
-
-    # Initialize homogeneous transformation matrices
-  T = np.eye(4)
-
-    # Compute transformation matrices for each joint
-  for i in range(3):
-        # Compute transformation matrix for joint i
-        T_i = homogenous_transformation_matrix([0, 0, 1], theta[i], [0, 0, d[i]])  # rotation about z-axis, translation along z-axis
-        T_i_next = homogenous_transformation_matrix([0, 1, 0], alpha[i], [a[i], 0, 0])  # rotation about y-axis, translation along x-axis
-        T = np.dot(T, np.dot(T_i, T_i_next))
-
-  hip_frame = T  # remove this line when you write your solution
+  hip_angle = joint_angles[0]
+  hip_frame = homogenous_transformation_matrix([0, 0, 1], hip_angle, [0, 0, 0])
+  hip_frame = np.linalg.inv(hip_frame)
   return hip_frame
 
 def fk_shoulder(joint_angles):
@@ -97,21 +84,9 @@ def fk_shoulder(joint_angles):
   Returns:
     4x4 matrix representing the pose of the shoulder frame in the base frame
   """
-  alpha = [0, np.pi / 2, 0]  # twist angles (radians)
-  a = [0, 0, UPPER_LEG_OFFSET]  # link lengths (meters)
-  d = [0, HIP_OFFSET, LOWER_LEG_OFFSET]  # link offsets (meters)
-  theta = joint_angles  # joint angles (radians)
-    
-    # Initialize transformation matrix
-  T = np.eye(4)
-    
-    # Compute transformation matrices for each joint
-  for i in range(2):  # Only go up to shoulder joint (skip elbow joint)
-        # Compute transformation matrix for joint i
-        T_i = homogenous_transformation_matrix([0, 0, 1], theta[i], [0, 0, d[i]])
-        T_i_next = homogenous_transformation_matrix([0, 1, 0], alpha[i], [a[i], 0, 0])
-        # Update the total transformation matrix
-        shoulder_frame = np.dot(T, np.dot(T_i, T_i_next))
+  hip_frame = fk_hip(joint_angles)
+  shoulder_frame = np.copy(hip_frame)
+  shoulder_frame[1, 3] += HIP_OFFSET
   return shoulder_frame
 
 def fk_elbow(joint_angles):
@@ -127,10 +102,9 @@ def fk_elbow(joint_angles):
   """
 
   # remove these lines when you write your solution
-  default_sphere_location = np.array([[0.15, 0.1, -0.1]])
-  elbow_frame = np.block(
-    [[np.eye(3), default_sphere_location.T], 
-     [0, 0, 0, 1]])
+  shoulder_frame = fk_shoulder(joint_angles)
+  elbow_frame = np.copy(shoulder_frame)
+  elbow_frame[2, 3] += UPPER_LEG_OFFSET 
   return elbow_frame
 
 def fk_foot(joint_angles):
@@ -144,10 +118,7 @@ def fk_foot(joint_angles):
   Returns:
     4x4 matrix representing the pose of the end effector frame in the base frame
   """
-
-  # remove these lines when you write your solution
-  default_sphere_location = np.array([[0.15, 0.2, -0.1]])
-  end_effector_frame = np.block(
-    [[np.eye(3), default_sphere_location.T], 
-     [0, 0, 0, 1]])
-  return end_effector_frame
+  elbow_frame = fk_elbow(joint_angles)
+  foot_frame = np.copy(T_elbow_base)
+  foot_frame[2, 3] += LOWER_LEG_OFFSET
+  return foot_frame
