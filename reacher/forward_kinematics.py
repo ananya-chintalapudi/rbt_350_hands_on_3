@@ -81,8 +81,8 @@ def fk_shoulder(joint_angles):
     4x4 matrix representing the pose of the shoulder frame in the base frame
   """
   hip_frame = fk_hip(joint_angles)
-  x = (-1) * HIP_OFFSET * np.sin(joint_angles[0])
-  y = HIP_OFFSET * np.cos(joint_angles[0])
+  x = HIP_OFFSET * np.sin(joint_angles[0])
+  y = (-1) * HIP_OFFSET * np.cos(joint_angles[0])
   v_A = np.array([x,y,0])
   shoulder_frame = homogenous_transformation_matrix([0, 1, 0], joint_angles[1], v_A)
   shoulder_frame = np.dot(shoulder_frame, hip_frame)
