@@ -18,9 +18,7 @@ def rotation_matrix(axis, angle):
     3x3 rotation matrix as a numpy array
   """
   c = np.cos(angle)
-  c = round(c, 5)
   s = np.sin(angle)
-  s = round(s, 5)
   t = 1 - c
   x, y, z = axis
     
@@ -53,8 +51,6 @@ def homogenous_transformation_matrix(axis, angle, v_A):
   T = np.eye(4)
   T[:3, :3] = rot_mat  # Assign rotation matrix to upper-left 3x3 submatrix
   T[:3, 3] = v_A  # Assign translation vector to the last column
-
-
   return T
 
 def fk_hip(joint_angles):
@@ -85,8 +81,11 @@ def fk_shoulder(joint_angles):
     4x4 matrix representing the pose of the shoulder frame in the base frame
   """
   hip_frame = fk_hip(joint_angles)
-  shoulder_frame = np.copy(hip_frame)
-  shoulder_frame[1, 3] -= HIP_OFFSET
+  x = (-1) * HIP_OFFSET * np.sin(joint_angles[0])
+  y = HIP_OFFSET * np.cos(joint_angles[0])
+  v_A = np.array([x,y,0])
+  shoulder_frame = homogenous_transformation_matrix([0, 1, 0], joint_angles[1], v_A)
+  shoulder_frame = np.dot(shoulder_frame, hip_frame)
   return shoulder_frame
 
 def fk_elbow(joint_angles):
