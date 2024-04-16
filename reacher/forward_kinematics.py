@@ -21,17 +21,12 @@ def rotation_matrix(axis, angle):
   s = np.sin(angle)
   t = 1 - c
   x, y, z = axis
-    
-  # Compute rotation matrix
+
   rot_mat = np.array([[t*x*x + c,    t*x*y - s*z,  t*x*z + s*y],
                   [t*x*y + s*z,  t*y*y + c,    t*y*z - s*x],
                   [t*x*z - s*y,  t*y*z + s*x,  t*z*z + c]])
-    
   
-  rot_mat = np.eye(3)
   return rot_mat
-
-#print(rotation_matrix([1,0,0], 1.57079632679))
 
 def homogenous_transformation_matrix(axis, angle, v_A):
   """
@@ -47,10 +42,9 @@ def homogenous_transformation_matrix(axis, angle, v_A):
   """
   rot_mat = rotation_matrix(axis, angle)
 
-    # Create a 4x4 transformation matrix
   T = np.eye(4)
-  T[:3, :3] = rot_mat  # Assign rotation matrix to upper-left 3x3 submatrix
-  T[:3, 3] = v_A  # Assign translation vector to the last column
+  T[:3, :3] = rot_mat 
+  T[:3, 3] = v_A 
   return T
 
 def fk_hip(joint_angles):
@@ -66,7 +60,6 @@ def fk_hip(joint_angles):
   """
   hip_angle = joint_angles[0]
   hip_frame = homogenous_transformation_matrix([0, 0, 1], hip_angle, [0, 0, 0])
-  hip_frame = np.linalg.inv(hip_frame)
   return hip_frame
 
 def fk_shoulder(joint_angles):
@@ -81,11 +74,13 @@ def fk_shoulder(joint_angles):
     4x4 matrix representing the pose of the shoulder frame in the base frame
   """
   hip_frame = fk_hip(joint_angles)
-  x = HIP_OFFSET * np.sin(joint_angles[0])
-  y = (-1) * HIP_OFFSET * np.cos(joint_angles[0])
-  v_A = np.array([x,y,0])
+  
+  y = (-1) * HIP_OFFSET
+  v_A = np.array([0,y,0])
+
   shoulder_frame = homogenous_transformation_matrix([0, 1, 0], joint_angles[1], v_A)
-  shoulder_frame = np.dot(shoulder_frame, hip_frame)
+  shoulder_frame = np.matmul(hip_frame, shoulder_frame)
+
   return shoulder_frame
 
 def fk_elbow(joint_angles):
@@ -100,16 +95,13 @@ def fk_elbow(joint_angles):
     4x4 matrix representing the pose of the elbow frame in the base frame
   """
   shoulder_frame = fk_shoulder(joint_angles)
-  
-  # get translation vector
-  x_elbow = UPPER_LEG_OFFSET * np.sin(joint_angles[1])
-  y_elbow = 0
-  z_elbow = UPPER_LEG_OFFSET * np.cos(joint_angles[1])
-  v_A = np.array([x_elbow, y_elbow, z_elbow])
+
+  # translation vector for elbow
+  v_A = np.array([0, 0, UPPER_LEG_OFFSET])
 
   elbow_frame = homogenous_transformation_matrix([0, 1, 0], joint_angles[2], v_A)
-  elbow_frame = np.dot(elbow_frame, shoulder_frame)
-
+  elbow_frame = np.matmul(shoulder_frame, elbow_frame)
+    
   return elbow_frame
 
 def fk_foot(joint_angles):
@@ -125,12 +117,9 @@ def fk_foot(joint_angles):
   """
   elbow_frame = fk_elbow(joint_angles)
 
-  x_foot = LOWER_LEG_OFFSET * np.sin(joint_angles[2])
-  y_foot = 0
-  z_foot = LOWER_LEG_OFFSET * np.cos(joint_angles[2])
-  v_A = np.array([x_foot, y_foot, z_foot])
+  v_A = np.array([0, 0, LOWER_LEG_OFFSET])
 
-  foot_frame = homogenous_transformation_matrix([0, 1, 0], 0, v_A)
-  foot_frame = np.dot(foot_frame, elbow_frame)
+  foot_frame = homogenous_transformation_matrix([0, 0, 0], 0, v_A)
+  foot_frame = np.matmul(elbow_frame, foot_frame)
 
   return foot_frame
