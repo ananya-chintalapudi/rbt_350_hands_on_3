@@ -31,7 +31,13 @@ def ik_cost(end_effector_pos, guess):
     cost = 0.0
 
     # Add your solution here.
-
+    end_effector_pos_matrix = forward_kinematics.fk_foot(guess)
+    
+    # Extract the translation part (XYZ coordinates) from the 4x4 transformation matrix
+    calculated_end_effector_pos = end_effector_pos_matrix[:3, 3]
+    
+    # Compute the Euclidean distance (L2 norm) between the desired and calculated end-effector positions
+    cost = np.linalg.norm(end_effector_pos - calculated_end_effector_pos)
     return cost
 
 def calculate_jacobian_FD(joint_angles, delta):
@@ -53,7 +59,23 @@ def calculate_jacobian_FD(joint_angles, delta):
     J = np.zeros((3, 3))
 
     # Add your solution here.
-
+    for i in range(3):
+        # Create a copy of the joint angles array
+        joint_angle = np.copy(joint_angles)
+        
+        # Perturb the i-th joint angle by delta
+        joint_angle[i] += delta
+        
+        # Calculate the end-effector position with perturbed joint angle
+        perturbed_end_effector_pos = forward_kinematics.fk_foot(joint_angle)[:3, 3]
+        # Calculate the end-effector position with original joint angles
+        original_end_effector_pos = forward_kinematics.fk_foot(joint_angles)[:3, 3]
+        
+        # Compute the partial derivative of the end-effector position with respect to the i-th joint angle
+        partial_derivative = (perturbed_end_effector_pos - original_end_effector_pos) / delta
+        
+        # Assign the partial derivative 
+        J[:, i] = partial_derivative
     return J
 
 def calculate_inverse_kinematics(end_effector_pos, guess):
@@ -87,6 +109,22 @@ def calculate_inverse_kinematics(end_effector_pos, guess):
         # Take a full Newton step to update the guess for joint angles
         # cost = # Add your solution here.
         # Calculate the cost based on the updated guess
+        J = calculate_jacobian_FD(guess, PERTURBATION)
+        
+        # Calculate the end-effector position for the current guess
+        calculated_end_effector_pos = forward_kinematics.fk_foot(guess)[:3, 3]
+        
+        # Calculate the residual 
+        residual = end_effector_pos - calculated_end_effector_pos
+        
+        #Moore-Penrose pseudoinverse of the Jacobian matrix
+        step = np.linalg.pinv(J) @ residual
+        
+        # Take a full Newton step 
+        guess += step
+        
+        # Calculate the cost based on the updated guess
+        cost = ik_cost(end_effector_pos, guess)
         if abs(previous_cost - cost) < TOLERANCE:
             break
         previous_cost = cost
