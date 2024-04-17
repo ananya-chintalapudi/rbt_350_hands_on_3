@@ -2,17 +2,17 @@ import math
 import numpy as np
 import copy
 from reacher import forward_kinematics
-
+import copy
 HIP_OFFSET = 0.0335
 UPPER_LEG_OFFSET = 0.10 # length of link 1
 LOWER_LEG_OFFSET = 0.13 # length of link 2
 TOLERANCE = 0.01 # tolerance for inverse kinematics
 PERTURBATION = 0.0001 # perturbation for finite difference method
-MAX_ITERATIONS = 10
+MAX_ITERATIONS = 10 #10
 
 def ik_cost(end_effector_pos, guess):
     """Calculates the inverse kinematics cost.
-
+    
     This function computes the inverse kinematics cost, which represents the Euclidean
     distance between the desired end-effector position and the end-effector position
     resulting from the provided 'guess' joint angles.
@@ -31,13 +31,13 @@ def ik_cost(end_effector_pos, guess):
     cost = 0.0
 
     # Add your solution here.
-    end_effector_pos_matrix = forward_kinematics.fk_foot(guess)
+    #end_effector_pos_matrix = forward_kinematics.fk_foot(guess)
     
     # Extract the translation part (XYZ coordinates) from the 4x4 transformation matrix
-    calculated_end_effector_pos = end_effector_pos_matrix[:3, 3]
+    #calculated_end_effector_pos = end_effector_pos_matrix[:3, 3]
     
     # Compute the Euclidean distance (L2 norm) between the desired and calculated end-effector positions
-    cost = np.linalg.norm(end_effector_pos - calculated_end_effector_pos)
+    cost = np.linalg.norm(end_effector_pos - guess)
     return cost
 
 def calculate_jacobian_FD(joint_angles, delta):
@@ -61,7 +61,7 @@ def calculate_jacobian_FD(joint_angles, delta):
     # Add your solution here.
     for i in range(3):
         # Create a copy of the joint angles array
-        joint_angle = np.copy(joint_angles)
+        joint_angle = copy.deepcopy(joint_angles)
         
         # Perturb the i-th joint angle by delta
         joint_angle[i] += delta
@@ -98,7 +98,7 @@ def calculate_inverse_kinematics(end_effector_pos, guess):
     previous_cost = np.inf
     # Initialize the current cost to 0.0
     cost = 0.0
-
+    print(guess)
     for iters in range(MAX_ITERATIONS):
         # Calculate the Jacobian matrix using finite differences
 
