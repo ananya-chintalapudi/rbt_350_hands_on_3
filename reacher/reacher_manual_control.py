@@ -49,20 +49,10 @@ intrinsic_matrix = np.array([[focal_length, 0, principal_point[0]],
                              [0, 0, 1]])
 
 def transform_to_global_frame(point_2d):
-    # Undistort the point
-    point_2d_undistorted = cv2.undistortPoints(point_2d, intrinsic_matrix, distortion_coefficients)
-    
-    # Reshape point_2d_undistorted to (1, 2) for conversion
-    point_2d_undistorted = point_2d_undistorted.reshape((1, 1, 2))
-    
-    # Convert pixel coordinates to camera coordinates
-    point_3d = cv2.convertPointsToHomogeneous(point_2d_undistorted)
-    
-    # Apply extrinsic parameters (rotation and translation) to get to global frame
-    # For simplicity, let's assume translation_vector is [0, 0, 0]
-    point_3d_global = np.dot(np.linalg.inv(intrinsic_matrix), point_3d.reshape((3, 1)))
-    
-    return point_3d_global[:3]  # Return only x, y, z coordinates
+  point_3d_camera_frame = cv2.convertPointsToHomogeneous(point_2d)
+  point_3d_global = np.dot(np.linalg.inv(intrinsic_matrix), point_3d_camera_frame.reshape((3, 1)))
+  point_3d_global[2] = 0
+  return point_3d_global[:3]
 
 def detect_and_transform_circles(frame):
     # Convert original image to BGR, since Lab is only available from BGR
@@ -83,6 +73,9 @@ def detect_and_transform_circles(frame):
     if circles is not None:
       circles = np.round(circles[0, :]).astype("int")
       center_x, center_y = circles[0, 0], circles[0, 1]
+      print("center x: ", center_x)
+      print("center y: ", center_y)
+      
 
       # Transform the center point to global frame
       center_point_camera_frame = np.array([[center_x, center_y]], dtype=np.float32)
@@ -208,17 +201,17 @@ def main(argv):
       except:
         pass
       if FLAGS.ik:
-        xyz = slider_values
-        # ret, captured_frame = cap.read()
-        # output_frame = captured_frame.copy()
+        # xyz = slider_values
+        ret, captured_frame = cap.read()
+        output_frame = captured_frame.copy()
 
         # # Detect circles and transform to global frame
-        # xyz = detect_and_transform_circles(output_frame)
+        xyz = detect_and_transform_circles(output_frame)
 
         # # Display the resulting frame, quit with q
-        # cv2.imshow('frame', output_frame)
-        # if cv2.waitKey(1) & 0xFF == ord('q'):
-        #   break
+        cv2.imshow('frame', output_frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+          break
         p.resetBasePositionAndOrientation(target_sphere_id, posObj=xyz, ornObj=[0, 0, 0, 1])
       else:
         joint_angles = slider_values
