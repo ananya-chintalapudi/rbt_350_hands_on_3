@@ -39,41 +39,47 @@ fps = 30
 horizontal_fov_degrees = 60
 
 # calculate focal length
-focal_length = resolution_width / (2 * np.tan(np.deg2rad(horizontal_fov_degrees / 2)))
+focal_length_w = resolution_width / (2 * np.tan(np.deg2rad(horizontal_fov_degrees / 2)))
+
+focal_length_h = resolution_height / (2 * np.tan(np.deg2rad(horizontal_fov_degrees / 2)))
 
 # assume principal point is at the center of the image
 principal_point = (resolution_width / 2, resolution_height / 2)
 
 # create matrix
-intrinsic_matrix = np.array([[focal_length, 0, principal_point[0]],
-                             [0, focal_length, principal_point[1]],
+intrinsic_matrix = np.array([[focal_length_w, 0, principal_point[0]],
+                             [0, focal_length_h, principal_point[1]],
                              [0, 0, 1]])
 
 # height of robot base of robot off of ground
-robot_base_height = -0.06
+robot_base_height = -0.07
+
+# depth: height of camera above ground
+depth = 0.67
 
 # transform point into robot frame, since we aligned the orientation of the camera to the robot frame, only z-axis is different from world frame
 def transform_to_robot_frame(point_2d):
-  # convert the 2d pixel coordinates to homogeous coordinate
-  point_3d_camera_frame = cv2.convertPointsToHomogeneous(point_2d)
-  # apply camera intrinsic matrix and get 3 x 1 vector of x, y, z to get coordinate in global frame
-  point_3d_global = np.dot(np.linalg.inv(intrinsic_matrix), point_3d_camera_frame.reshape((3, 1)))
-  # set z to height off ground to account for robot frame
-  point_3d_global[2] = robot_base_height
-  return point_3d_global
+  # apply camera intrinsic matrix to get coordinate in global frame
+  red_dot_global = np.linalg.inv(intrinsic_matrix) @ np.array([point_2d[0][0], point_2d[0][1], 1])
+  # account for rotation and height of camera
+  red_dot_global = red_dot_global * depth
+  red_dot_global[1] = red_dot_global[1] * -1
+  # account for base of robot being above ground
+  red_dot_global[2] = robot_base_height
+  return red_dot_global
 
 # detect circles and return the coordinate in the robot frame
 def detect_and_transform_circles(frame):
-  # reduce noise
-  captured_frame_bgr = cv2.medianBlur(captured_frame_bgr, 3)
+  # reduce noise from frame
+  blurred_frame = cv2.medianBlur(frame, 3)
   # separate into channels so can extract red
-  captured_frame_lab = cv2.cvtColor(captured_frame_bgr, cv2.COLOR_BGR2Lab)
+  channeled_frame = cv2.cvtColor(blurred_frame, cv2.COLOR_BGR2Lab)
   # threshold to get red pixels
-  captured_frame_lab_red = cv2.inRange(captured_frame_lab, np.array([20, 150, 150]), np.array([190, 255, 255]))
+  frame_red = cv2.inRange(channeled_frame, np.array([20, 150, 150]), np.array([190, 255, 255]))
   # blur again to reduce noise and account for other red detections
-  captured_frame_lab_red = cv2.GaussianBlur(captured_frame_lab_red, (5, 5), 2, 2)
+  frame_red = cv2.GaussianBlur(frame_red, (5, 5), 2, 2)
   # hough transform to detect circles, min and max radius set to prevent it from picking up on our leg as a circle
-  circles = cv2.HoughCircles(captured_frame_lab_red, cv2.HOUGH_GRADIENT, 1, captured_frame_lab_red.shape[0] / 8, param1=100, param2=18, minRadius=50, maxRadius=100)
+  circles = cv2.HoughCircles(frame_red, cv2.HOUGH_GRADIENT, 1, frame_red.shape[0] / 8, param1=100, param2=18, minRadius=50, maxRadius=100)
 
   if circles is not None:
     circles = np.round(circles[0, :]).astype("int")
@@ -85,11 +91,11 @@ def detect_and_transform_circles(frame):
     center_point_camera_frame = np.array([[center_x, center_y]], dtype=np.float32)
     center_point_robot_frame = transform_to_robot_frame(center_point_camera_frame)
     # get x, y, z coordinates in robot frame
-    x = center_point_robot_frame[0][0]
+    x = center_point_robot_frame[0]
     print(x)
-    y = center_point_robot_frame[1][0]
+    y = center_point_robot_frame[1]
     print(y)
-    z = center_point_robot_frame[2][0]
+    z = center_point_robot_frame[2]
     print(z)
 
     print("robot frame coordinates:", center_point_robot_frame)
