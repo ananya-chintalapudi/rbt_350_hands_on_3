@@ -27,82 +27,84 @@ HIP_OFFSET = 0.0335  # meters
 L1 = 0.08  # meters
 L2 = 0.11  # meters
 
-# Define the resolution and frame rate of the video recording
-resolution_width = 1920  # Width of the video resolution
-resolution_height = 1080  # Height of the video resolution
-fps = 30  # Frame rate of the video recording
+# CAMERA INTRINSIC MATRIX
 
-# Calculate the focal length based on the resolution and field of view
-# Assuming a horizontal field of view of 60 degrees (common for smartphone cameras)
+# video resolution width
+resolution_width = 1920  
+# video resolution height
+resolution_height = 1080
+# frame rate
+fps = 30
+# assume fov 60 since it is common for smartphone cameras
 horizontal_fov_degrees = 60
+
+# calculate focal length
 focal_length = resolution_width / (2 * np.tan(np.deg2rad(horizontal_fov_degrees / 2)))
 
-# Calculate the principal point (assuming it's at the center of the image)
+# assume principal point is at the center of the image
 principal_point = (resolution_width / 2, resolution_height / 2)
 
-# Assume no distortion
-distortion_coefficients = np.zeros((4, 1))
-
-# Calculate the approximate intrinsic matrix
+# create matrix
 intrinsic_matrix = np.array([[focal_length, 0, principal_point[0]],
                              [0, focal_length, principal_point[1]],
                              [0, 0, 1]])
 
-def transform_to_global_frame(point_2d):
+# height of robot base of robot off of ground
+robot_base_height = -0.06
+
+# transform point into robot frame, since we aligned the orientation of the camera to the robot frame, only z-axis is different from world frame
+def transform_to_robot_frame(point_2d):
+  # convert the 2d pixel coordinates to homogeous coordinate
   point_3d_camera_frame = cv2.convertPointsToHomogeneous(point_2d)
+  # apply camera intrinsic matrix and get 3 x 1 vector of x, y, z to get coordinate in global frame
   point_3d_global = np.dot(np.linalg.inv(intrinsic_matrix), point_3d_camera_frame.reshape((3, 1)))
-  point_3d_global[2] = 0
-  return point_3d_global[:3]
+  # set z to height off ground to account for robot frame
+  point_3d_global[2] = robot_base_height
+  return point_3d_global
 
+# detect circles and return the coordinate in the robot frame
 def detect_and_transform_circles(frame):
-    # Convert original image to BGR, since Lab is only available from BGR
-    captured_frame_bgr = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-    # First blur to reduce noise prior to color space conversion
-    captured_frame_bgr = cv2.medianBlur(captured_frame_bgr, 3)
-    # Convert to Lab color space, we only need to check one channel (a-channel) for red here
-    captured_frame_lab = cv2.cvtColor(captured_frame_bgr, cv2.COLOR_BGR2Lab)
-    # Threshold the Lab image, keep only the red pixels
-    # Possible yellow threshold: [20, 110, 170][255, 140, 215]
-    # Possible blue threshold: [20, 115, 70][255, 145, 120]
-    captured_frame_lab_red = cv2.inRange(captured_frame_lab, np.array([20, 150, 150]), np.array([190, 255, 255]))
-    # Second blur to reduce more noise, easier circle detection
-    captured_frame_lab_red = cv2.GaussianBlur(captured_frame_lab_red, (5, 5), 2, 2)
-    # Use the Hough transform to detect circles in the image
-    circles = cv2.HoughCircles(captured_frame_lab_red, cv2.HOUGH_GRADIENT, 1, captured_frame_lab_red.shape[0] / 8, param1=100, param2=18, minRadius=5, maxRadius=60)
+  # reduce noise
+  captured_frame_bgr = cv2.medianBlur(captured_frame_bgr, 3)
+  # separate into channels so can extract red
+  captured_frame_lab = cv2.cvtColor(captured_frame_bgr, cv2.COLOR_BGR2Lab)
+  # threshold to get red pixels
+  captured_frame_lab_red = cv2.inRange(captured_frame_lab, np.array([20, 150, 150]), np.array([190, 255, 255]))
+  # blur again to reduce noise and account for other red detections
+  captured_frame_lab_red = cv2.GaussianBlur(captured_frame_lab_red, (5, 5), 2, 2)
+  # hough transform to detect circles, min and max radius set to prevent it from picking up on our leg as a circle
+  circles = cv2.HoughCircles(captured_frame_lab_red, cv2.HOUGH_GRADIENT, 1, captured_frame_lab_red.shape[0] / 8, param1=100, param2=18, minRadius=50, maxRadius=100)
 
-    if circles is not None:
-      circles = np.round(circles[0, :]).astype("int")
-      center_x, center_y = circles[0, 0], circles[0, 1]
-      print("center x: ", center_x)
-      print("center y: ", center_y)
-      
+  if circles is not None:
+    circles = np.round(circles[0, :]).astype("int")
+    # get pixel coordinates of circles
+    center_x, center_y = circles[0, 0], circles[0, 1]
+    print("pixel coordinates:", center_x, center_y)
 
-      # Transform the center point to global frame
-      center_point_camera_frame = np.array([[center_x, center_y]], dtype=np.float32)
-      center_point_global_frame = transform_to_global_frame(center_point_camera_frame)
+    # transform pixel coordinate to robot frame
+    center_point_camera_frame = np.array([[center_x, center_y]], dtype=np.float32)
+    center_point_robot_frame = transform_to_robot_frame(center_point_camera_frame)
+    # get x, y, z coordinates in robot frame
+    x = center_point_robot_frame[0][0]
+    print(x)
+    y = center_point_robot_frame[1][0]
+    print(y)
+    z = center_point_robot_frame[2][0]
+    print(z)
 
-      # Extract x, y, z coordinates
-      x_angle = center_point_global_frame[0][0]
-      print(x_angle)
-      y_angle = center_point_global_frame[1][0]
-      print(y_angle)
-      z_angle = center_point_global_frame[2][0]
-      print(z_angle)
+    print("robot frame coordinates:", center_point_robot_frame)
+    # draw black circle for visual testing that the circle has been detected
+    cv2.circle(frame, center=(center_x, center_y), radius=circles[0, 2], color=(0, 0, 0), thickness=2)
 
-      print("Circle center in global frame:", center_point_global_frame)
+    return np.array([x, y, z])
 
-      # Draw circle on output frame
-      cv2.circle(frame, center=(center_x, center_y), radius=circles[0, 2], color=(0, 255, 0), thickness=2)
+  # no circles, returns 0
+  return np.zeros(3)
 
-      # Return as NumPy array
-      return np.array([x_angle, y_angle, z_angle])
-
-    # If no circles detected, return zeros
-    return np.zeros(3)
-
+# start video
 cap = cv2.VideoCapture(0)
 
-# Set the resolution and frame rate of the video capture
+# set resolution/frame rate of video capture
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, resolution_width)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution_height)
 cap.set(cv2.CAP_PROP_FPS, fps)
@@ -201,14 +203,14 @@ def main(argv):
       except:
         pass
       if FLAGS.ik:
-        # xyz = slider_values
+        # xyz = slider_values (original code)
         ret, captured_frame = cap.read()
         output_frame = captured_frame.copy()
 
-        # # Detect circles and transform to global frame
+        # detect circles and transform to robot frame to be used as x, y, z target end-effector position
         xyz = detect_and_transform_circles(output_frame)
 
-        # # Display the resulting frame, quit with q
+        # display what camera is recording for visual testing
         cv2.imshow('frame', output_frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
           break
